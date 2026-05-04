@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Suspects — CrimAI{% endblock %}
+
+{% if any_processing %}
+<meta http-equiv="refresh" content="10">
+{% endif %}
+
+{% block content %}
+<style>
+  /* ── Layout ── */
+  .suspects-wrap { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; align-items: start; }
+  @media (max-width: 960px) { .suspects-wrap { grid-template-columns: 1fr; } }
+
+  /* ── Toolbar ── */
+  .suspects-toolbar { display: flex; gap: .75rem; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; }
+  .suspects-toolbar .search-input { flex: 1; min-width: 180px; }
+
+  /* ── Suspect cards grid ── */
+  .suspect-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+
+  .s-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+            overflow: hidden; transition: transform .15s, box-shadow .15s; display: flex; flex-direction: column; }
+  .s-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+
+  .s-photo { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block; background: var(--surface2); }
+  .s-photo-placeholder { width: 100%; aspect-ratio: 1/1; display: flex; align-items: center;
+                          justify-content: center; background: var(--surface2); font-size: 3.5rem;
+                          color: var(--text-muted); }
+
+  .s-body { padding: .85rem; flex: 1; display: flex; flex-direction: column; gap: .4rem; }
+  .s-name { font-weight: 700; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .s-region { font-size: .78rem; color: var(--text-muted); }
+  .s-date   { font-size: .75rem; color: var(--text-muted); margin-top: auto; }
+
+  .s-footer { padding: .65rem .85rem; border-top: 1px solid var(--border);
+              display: flex; justify-content: space-between; align-items: center; }
+
+  /* Status badges */
+  .st-processing { background: rgba(245,158,11,.15); color: #f59e0b; }
+  .st-ready      { background: rgba(34,197,94,.15);  color: #22c55e; }
+  .st-failed     { background: rgba(239,68,68,.15);  color: #ef4444; }
+
+  /* ── Sidebar forms ── */
+  .sidebar-form { position: sticky; top: calc(var(--nav-height) + 1rem); display: flex; flex-direction: column; gap: 1rem; }
+  .form-card h3 { font-size: .95rem; font-weight: 700; margin-bottom: 1rem; }
+  .form-card p.hint { font-size: .8rem; color: var(--text-muted); margin-bottom: .75rem; }
+
+  /* Pagination */
+  .pagination { display: flex; align-items: center; gap: .5rem; margin-top: 1.25rem; justify-content: center; }
+
+  /* Empty state */
+  .empty-grid { text-align: center; padding: 3rem; color: var(--text-muted); grid-column: 1/-1; }
+  .empty-grid .icon { font-size: 3rem; margin-bottom: .75rem; }
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+  <h1 style="font-size:1.4rem;font-weight:700;">
+    Suspects
+    <span style="font-size:.85rem;font-weight:400;color:var(--text-muted);margin-left:.5rem;">
+      {{ pagination.total }} enrolled
+    </span>
+  </h1>
+</div>
+
+<div class="suspects-wrap">
+
+  <!-- ── Left: suspect cards ── -->
+  <div>
+    <div class="suspects-toolbar">
+      <input type="text" id="suspect-search" class="search-input form-control"
+             placeholder="Search by name or region…">
+    </div>
+
+    {% if suspects %}
+    <div class="suspect-grid">
+      {% for s in suspects %}
+      <div class="s-card suspect-row">
+        {% if s.photo_path %}
+        <img class="s-photo"
+             src="{{ url_for('static', filename=s.photo_path) }}"
+             alt="{{ s.name }}"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div class="s-photo-placeholder" style="display:none;">👤</div>
+        {% else %}
+        <div class="s-photo-placeholder">👤</div>
+        {% endif %}
+
+        <div class="s-body">
+          <div class="s-name" title="{{ s.name }}">{{ s.name }}</div>
+          <div class="s-region">📍 {{ s.region or 'Unknown' }}</div>
+          <div class="s-date">{{ s.added_at.strftime('%d %b %Y') }}</div>
+        </div>
+
+        <div class="s-footer">
+          {% if s.enroll_status == 'processing' %}
+            <span class="badge st-processing">⟳ Building</span>
+          {% elif s.enroll_status == 'ready' %}
+            <span class="badge st-ready">✓ Ready</span>
+          {% else %}
+            <span class="badge st-failed">✗ Failed</span>
+          {% endif %}
+
+          <form method="POST" action="{{ url_for('main.delete_suspect', suspect_id=s.id) }}"
+                onsubmit="return confirm('Delete {{ s.name }}?')">
+            <button type="submit" class="btn btn-danger btn-sm">🗑</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if pagination.pages > 1 %}
+    <div class="pagination">
+      {% if pagination.has_prev %}
+      <a href="{{ url_for('main.suspects', page=pagination.prev_num) }}" class="btn btn-secondary btn-sm">← Prev</a>
+      {% endif %}
+      <span style="font-size:.85rem;color:var(--text-muted);">{{ pagination.page }} / {{ pagination.pages }}</span>
+      {% if pagination.has_next %}
+      <a href="{{ url_for('main.suspects', page=pagination.next_num) }}" class="btn btn-secondary btn-sm">Next →</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="suspect-grid">
+      <div class="empty-grid">
+        <div class="icon">🕵️</div>
+        <p>No suspects enrolled yet.</p>
+        <p style="font-size:.85rem;margin-top:.4rem;">Use the form on the right to add one.</p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── Right: enrollment forms ── -->
+  <aside class="sidebar-form">
+
+    <!-- Single enrollment -->
+    <div class="card form-card">
+      <h3>➕ Enroll Suspect</h3>
+      <form method="POST" action="{{ url_for('main.enroll_suspect') }}" enctype="multipart/form-data">
+        <div class="form-group">
+          <label class="form-label" for="enroll-name">Full Name</label>
+          <input type="text" id="enroll-name" name="name" class="form-control"
+                 placeholder="e.g. John Doe" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="enroll-region">Region</label>
+          <select id="enroll-region" name="region" class="form-control form-select">
+            {% for r in regions %}
+            <option value="{{ r }}">{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="enroll-photo">Photo (jpg / png)</label>
+          <input type="file" id="enroll-photo" name="photo" class="form-control"
+                 accept=".jpg,.jpeg,.png" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;">Enroll</button>
+      </form>
+    </div>
+
+    <!-- Group enrollment -->
+    <div class="card form-card">
+      <h3>👥 Group Enrollment</h3>
+      <p class="hint">Upload a group photo — one suspect record is created per detected face automatically.</p>
+      <form method="POST" action="{{ url_for('main.enroll_group') }}" enctype="multipart/form-data">
+        <div class="form-group">
+          <label class="form-label" for="group-photo">Group Photo</label>
+          <input type="file" id="group-photo" name="photo" class="form-control"
+                 accept=".jpg,.jpeg,.png" required>
+        </div>
+        <button type="submit" class="btn btn-secondary" style="width:100%;">Detect &amp; Enroll</button>
+      </form>
+    </div>
+
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  initLiveSearch('suspect-search', '.suspect-row', null);
+</script>
+{% endblock %}

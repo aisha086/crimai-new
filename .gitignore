@@ -1,0 +1,7 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+instance/
+*.sqlite
+app/static/uploads/

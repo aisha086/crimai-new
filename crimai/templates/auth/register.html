@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Register — CrimAI{% endblock %}
+{% block content %}
+<div style="max-width:400px;margin:4rem auto;">
+  <div class="card">
+    <h2 style="margin-bottom:1.5rem;font-size:1.25rem;">Create Account</h2>
+    <form method="POST" action="{{ url_for('auth.register') }}">
+      <div class="form-group">
+        <label class="form-label" for="username">Username</label>
+        <input class="form-control" type="text" id="username" name="username" required autofocus>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input class="form-control" type="password" id="password" name="password" required>
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%;margin-top:0.5rem;">Register</button>
+    </form>
+    <p style="margin-top:1rem;text-align:center;color:var(--text-muted);font-size:0.85rem;">
+      Already have an account? <a href="{{ url_for('auth.login') }}">Sign in</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

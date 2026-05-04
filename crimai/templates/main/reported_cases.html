@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Reported Cases — CrimAI{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Reported Cases</h1>
+
+<!-- Filter Form -->
+<div class="card filter-card">
+  <form method="GET" action="{{ url_for('main.reported_cases') }}" class="filter-form">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status" class="form-control">
+          <option value="">All Statuses</option>
+          <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+          <option value="running" {% if status_filter == 'running' %}selected{% endif %}>Running</option>
+          <option value="done" {% if status_filter == 'done' %}selected{% endif %}>Done</option>
+          <option value="failed" {% if status_filter == 'failed' %}selected{% endif %}>Failed</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="region">Region</label>
+        <select id="region" name="region" class="form-control">
+          <option value="">All Regions</option>
+          {% for r in regions %}
+          <option value="{{ r }}" {% if region_filter == r %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group form-group-submit">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="{{ url_for('main.reported_cases') }}" class="btn">Clear</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Cases Grid -->
+{% if media_records %}
+<div class="media-grid">
+  {% for m in media_records %}
+  <div class="media-card">
+    <div class="media-card-header">
+      <span class="badge badge-priority-{{ m.priority | lower }}">{{ m.priority }}</span>
+      <span class="badge badge-status-{{ m.status }}">{{ m.status | capitalize }}</span>
+    </div>
+    <div class="media-card-body">
+      <p><strong>Case:</strong> {{ m.case_id or '—' }}</p>
+      <p><strong>File:</strong> {{ m.filename }}</p>
+      <p><strong>Inspector:</strong> {{ m.inspector or '—' }}</p>
+      <p><strong>Region:</strong> {{ m.region or '—' }}</p>
+      <p><strong>Uploaded:</strong> {{ m.uploaded_at.strftime('%Y-%m-%d %H:%M') }}</p>
+      {% if m.report %}
+      <p><strong>Report updated:</strong> {{ m.report.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+      {% endif %}
+    </div>
+    <div class="media-card-footer">
+      <a href="{{ url_for('main.results', media_id=m.id) }}" class="btn btn-sm">View Results</a>
+      <a href="{{ url_for('main.report_editor', media_id=m.id) }}" class="btn btn-sm">Edit Report</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty-state">No reported cases found.</p>
+{% endif %}
+{% endblock %}

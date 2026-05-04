@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Detect — CrimAI{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Upload Evidence</h1>
+
+<div class="card">
+  <form method="POST" action="{{ url_for('main.detect_post') }}" enctype="multipart/form-data">
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="case_id">Case ID</label>
+        <input type="text" id="case_id" name="case_id" class="form-control" placeholder="e.g. CASE-2024-001">
+      </div>
+      <div class="form-group">
+        <label for="priority">Priority</label>
+        <select id="priority" name="priority" class="form-control">
+          <option value="Critical">Critical</option>
+          <option value="High">High</option>
+          <option value="Medium" selected>Medium</option>
+          <option value="Low">Low</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" class="form-control" rows="3"
+                placeholder="Brief description of the case…"></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="location">Location</label>
+        <input type="text" id="location" name="location" class="form-control" placeholder="e.g. City Centre">
+      </div>
+      <div class="form-group">
+        <label for="region">Region</label>
+        <select id="region" name="region" class="form-control">
+          {% for r in regions %}
+          <option value="{{ r }}">{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="inspector">Inspector</label>
+      <input type="text" id="inspector" name="inspector" class="form-control" placeholder="Inspector name">
+    </div>
+
+    <!-- Upload Mode -->
+    <div class="form-group">
+      <label>Upload Mode</label>
+      <div class="radio-group">
+        <label class="radio-label">
+          <input type="radio" name="upload_mode" value="open_search" checked>
+          Open Search
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="upload_mode" value="dataset">
+          Dataset
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="upload_mode" value="group_image">
+          Group Image
+        </label>
+      </div>
+    </div>
+
+    <!-- File Upload -->
+    <div class="form-group">
+      <label for="files">Files</label>
+      <input type="file" id="files" name="files" class="form-control" multiple
+             accept=".jpg,.jpeg,.png,.mp4,.avi,.mov,.mkv">
+      <small class="form-hint">Accepted: jpg, jpeg, png, mp4, avi, mov, mkv. Multiple files allowed.</small>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Upload &amp; Process</button>
+  </form>
+</div>
+{% endblock %}

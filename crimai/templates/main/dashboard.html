@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — CrimAI{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Dashboard</h1>
+
+<!-- KPI Cards -->
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">Total Suspects</div>
+    <div class="kpi-value" data-target="{{ total_suspects }}">0</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Total Media</div>
+    <div class="kpi-value" data-target="{{ total_media }}">0</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Processed Media</div>
+    <div class="kpi-value" data-target="{{ processed_media }}">0</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Pending Media</div>
+    <div class="kpi-value" data-target="{{ pending_media }}">0</div>
+  </div>
+</div>
+
+<!-- Recent Detections -->
+<section class="section">
+  <h2>Recent Detections</h2>
+  {% if recent_detections %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Suspect</th>
+        <th>Confidence</th>
+        <th>Detected At</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for det in recent_detections %}
+      <tr>
+        <td>{{ det.suspect.name if det.suspect else 'Unknown' }}</td>
+        <td>{{ "%.1f%%"|format(det.confidence * 100) }}</td>
+        <td>{{ det.detected_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td><a href="{{ url_for('main.results', media_id=det.media_id) }}" class="btn btn-sm">View</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">No detections yet.</p>
+  {% endif %}
+</section>
+
+<!-- Charts -->
+<div class="charts-row">
+  <div class="chart-card">
+    <h2>Detections by Region</h2>
+    <canvas id="barChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h2>Monthly Detections</h2>
+    <canvas id="lineChart"></canvas>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Counter animation
+  document.querySelectorAll('.kpi-value[data-target]').forEach(function(el) {
+    var target = parseInt(el.getAttribute('data-target'), 10);
+    var step = Math.ceil(target / 40) || 1;
+    var current = 0;
+    var timer = setInterval(function() {
+      current = Math.min(current + step, target);
+      el.textContent = current;
+      if (current >= target) clearInterval(timer);
+    }, 30);
+  });
+
+  var regionCounts = {{ region_counts | tojson }};
+  var monthlyCounts = {{ monthly_counts | tojson }};
+
+  drawBarChart('barChart', regionCounts);
+  drawLineChart('lineChart', monthlyCounts);
+</script>
+{% endblock %}

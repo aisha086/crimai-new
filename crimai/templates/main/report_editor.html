@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Report Editor — {{ media.case_id or media.filename }} — CrimAI{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Report Editor</h1>
+
+<div class="card">
+  <div class="editor-meta">
+    <p><strong>Case:</strong> {{ media.case_id or '—' }}</p>
+    <p><strong>File:</strong> {{ media.filename }}</p>
+    <p><strong>Inspector:</strong> {{ media.inspector or '—' }}</p>
+  </div>
+
+  <div id="toast" class="toast" style="display:none;"></div>
+
+  <textarea id="report-content" name="html_content">{{ default_html }}</textarea>
+
+  <div class="editor-actions">
+    <button type="button" class="btn btn-primary" onclick="saveReport()">Save Report</button>
+    <a href="{{ url_for('main.results', media_id=media.id) }}" class="btn">← Back to Results</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+<script>
+  tinymce.init({
+    selector: '#report-content',
+    height: 500,
+    plugins: 'lists link table code',
+    toolbar: 'undo redo | bold italic | bullist numlist | link table | code',
+    promotion: false
+  });
+
+  function saveReport() {
+    var content = tinymce.get('report-content').getContent();
+    var formData = new FormData();
+    formData.append('html_content', content);
+
+    fetch('/report/custom/save/{{ media.id }}', {
+      method: 'POST',
+      body: formData
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      showToast(data.success ? 'Report saved.' : 'Error: ' + (data.error || 'Unknown error.'),
+                data.success ? 'success' : 'error');
+    })
+    .catch(function() {
+      showToast('Network error. Please try again.', 'error');
+    });
+  }
+
+  function showToast(message, type) {
+    var toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = 'toast toast-' + type;
+    toast.style.display = 'block';
+    setTimeout(function() { toast.style.display = 'none'; }, 3000);
+  }
+</script>
+{% endblock %}

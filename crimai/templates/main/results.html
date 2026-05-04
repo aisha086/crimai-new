@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+{% block title %}Results — {{ media.case_id or media.filename }} — CrimAI{% endblock %}
+
+{% block content %}
+<style>
+  /* ── Page-level overrides ── */
+  .results-wrap {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  @media (max-width: 900px) { .results-wrap { grid-template-columns: 1fr; } }
+
+  /* Sidebar */
+  .meta-card { position: sticky; top: calc(var(--nav-height) + 1.5rem); }
+  .meta-row { display: flex; justify-content: space-between; align-items: center;
+              padding: 0.55rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+  .meta-row:last-child { border-bottom: none; }
+  .meta-label { color: var(--text-muted); font-weight: 500; }
+  .meta-value { color: var(--text); text-align: right; max-width: 160px;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Priority colours */
+  .pri-critical { background: rgba(239,68,68,.15); color: #ef4444; }
+  .pri-high     { background: rgba(245,158,11,.15); color: #f59e0b; }
+  .pri-medium   { background: rgba(79,142,247,.15); color: #4f8ef7; }
+  .pri-low      { background: rgba(34,197,94,.15);  color: #22c55e; }
+
+  /* Video player */
+  .video-wrap { border-radius: 12px; overflow: hidden; background: #000;
+                box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+  .video-wrap video { width: 100%; display: block; max-height: 520px; }
+
+  /* Spinner */
+  .spinner-wrap { display: flex; flex-direction: column; align-items: center;
+                  gap: 1.25rem; padding: 3rem; }
+  .spinner { width: 48px; height: 48px; border: 4px solid var(--border);
+             border-top-color: var(--accent); border-radius: 50%;
+             animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Error box */
+  .error-box { border-left: 4px solid var(--danger); background: rgba(239,68,68,.08);
+               border-radius: 10px; padding: 1.25rem; }
+  .error-box strong { color: var(--danger); display: block; margin-bottom: .4rem; }
+
+  /* Section headings */
+  .section-head { display: flex; align-items: center; gap: .6rem;
+                  font-size: 1rem; font-weight: 700; margin: 1.75rem 0 1rem; }
+  .section-head .count { background: var(--surface2); border: 1px solid var(--border);
+                         border-radius: 999px; padding: .15em .65em;
+                         font-size: .75rem; color: var(--text-muted); }
+
+  /* Detection cards */
+  .det-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+  .det-card { background: var(--surface); border: 1px solid var(--border);
+              border-radius: 12px; overflow: hidden;
+              transition: transform .15s, box-shadow .15s; }
+  .det-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+  .det-card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block; }
+  .det-card .no-img { width: 100%; aspect-ratio: 1/1; display: flex; align-items: center;
+                      justify-content: center; background: var(--surface2);
+                      color: var(--text-muted); font-size: 2rem; }
+  .det-body { padding: .75rem; }
+  .det-name { font-weight: 600; font-size: .9rem; margin-bottom: .4rem;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conf-wrap { height: 6px; background: var(--surface2); border-radius: 999px;
+               overflow: hidden; margin-bottom: .35rem; }
+  .conf-bar  { height: 100%; border-radius: 999px; background: var(--accent); }
+  .conf-bar.high { background: var(--success); }
+  .conf-bar.med  { background: var(--warning); }
+  .conf-bar.low  { background: var(--danger); }
+  .det-meta { font-size: .75rem; color: var(--text-muted); display: flex;
+              justify-content: space-between; }
+
+  /* Unknown cards */
+  .unk-card { background: var(--surface); border: 1px solid var(--border);
+              border-radius: 12px; overflow: hidden; opacity: .85; }
+  .unk-card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block;
+                  filter: grayscale(60%); }
+  .unk-body { padding: .75rem; }
+  .unk-label { font-size: .8rem; color: var(--text-muted); font-style: italic; }
+
+  /* Action buttons */
+  .action-row { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1.25rem; }
+</style>
+
+<div class="results-wrap">
+
+  <!-- ── Sidebar ── -->
+  <aside>
+    <div class="card meta-card">
+      <div style="font-size:1rem;font-weight:700;margin-bottom:1rem;">📋 Case Info</div>
+
+      <div class="meta-row">
+        <span class="meta-label">Case ID</span>
+        <span class="meta-value">{{ media.case_id or '—' }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">File</span>
+        <span class="meta-value" title="{{ media.filename }}">{{ media.filename }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Type</span>
+        <span class="meta-value">{{ media.file_type | capitalize }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Inspector</span>
+        <span class="meta-value">{{ media.inspector or '—' }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Region</span>
+        <span class="meta-value">{{ media.region or '—' }}</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Priority</span>
+        <span class="meta-value">
+          <span class="badge pri-{{ media.priority | lower }}">{{ media.priority }}</span>
+        </span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Status</span>
+        <span class="meta-value">
+          {% if media.status == 'done' %}
+            <span class="badge badge-success">✓ Done</span>
+          {% elif media.status == 'running' %}
+            <span class="badge badge-info">⟳ Running</span>
+          {% elif media.status == 'failed' %}
+            <span class="badge badge-danger">✗ Failed</span>
+          {% else %}
+            <span class="badge badge-secondary">{{ media.status }}</span>
+          {% endif %}
+        </span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Uploaded</span>
+        <span class="meta-value">{{ media.uploaded_at.strftime('%d %b %Y') }}</span>
+      </div>
+      {% if media.finished_at %}
+      <div class="meta-row">
+        <span class="meta-label">Finished</span>
+        <span class="meta-value">{{ media.finished_at.strftime('%d %b %Y %H:%M') }}</span>
+      </div>
+      {% endif %}
+
+      {% if media.status == 'running' %}
+      <div style="margin-top:1rem;">
+        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.4rem;">
+          Progress — <span id="prog-pct">{{ media.progress }}</span>%
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="prog-bar" style="width:{{ media.progress }}%"></div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="action-row">
+        <a href="{{ url_for('main.report_editor', media_id=media.id) }}" class="btn btn-primary btn-sm">
+          📝 Edit Report
+        </a>
+        <a href="{{ url_for('main.history') }}" class="btn btn-secondary btn-sm">← History</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main column ── -->
+  <div>
+
+    <!-- Video / status area -->
+    {% if media.status == 'done' and media.output_path %}
+    <div class="video-wrap">
+      <video controls preload="metadata">
+        <source src="{{ url_for('static', filename=media.output_path) }}">
+        Your browser does not support HTML5 video.
+      </video>
+    </div>
+    {% elif media.status == 'done' and not media.output_path %}
+    {# Image — no output video, just show detections below #}
+    <div class="card" style="padding:1rem;color:var(--text-muted);font-size:.9rem;">
+      ✓ Image processed — see detections below.
+    </div>
+    {% elif media.status == 'running' %}
+    <div class="card spinner-wrap">
+      <div class="spinner"></div>
+      <p style="color:var(--text-muted);">Processing… please wait</p>
+      <div style="width:100%;max-width:320px;">
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="prog-bar-main" style="width:{{ media.progress }}%"></div>
+        </div>
+        <div style="text-align:center;font-size:.8rem;color:var(--text-muted);margin-top:.4rem;">
+          <span id="prog-pct-main">{{ media.progress }}</span>%
+        </div>
+      </div>
+    </div>
+    {% elif media.status == 'failed' %}
+    <div class="error-box">
+      <strong>⚠ Processing failed</strong>
+      <p style="font-size:.875rem;color:var(--text);">{{ media.error_msg or 'An unknown error occurred.' }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Detections -->
+    {% if detections %}
+    <div class="section-head">
+      🎯 Matched Suspects
+      <span class="count">{{ detections | length }}</span>
+    </div>
+    <div class="det-grid">
+      {% for det in detections %}
+      {% set pct = (det.confidence * 100) | round(1) %}
+      {% set bar_class = 'high' if det.confidence >= 0.75 else ('med' if det.confidence >= 0.5 else 'low') %}
+      <div class="det-card">
+        {% if det.crop_path %}
+        <img src="{{ url_for('static', filename=det.crop_path) }}"
+             alt="{{ det.suspect.name if det.suspect else 'Unknown' }}"
+             onerror="this.parentElement.innerHTML='<div class=\'no-img\'>👤</div>'">
+        {% else %}
+        <div class="no-img">👤</div>
+        {% endif %}
+        <div class="det-body">
+          <div class="det-name">{{ det.suspect.name if det.suspect else 'Unknown' }}</div>
+          <div class="conf-wrap">
+            <div class="conf-bar {{ bar_class }}" style="width:{{ pct }}%"></div>
+          </div>
+          <div class="det-meta">
+            <span>{{ pct }}% match</span>
+            {% if det.timestamp_sec is not none and det.timestamp_sec > 0 %}
+            <span>@ {{ "%.1fs" | format(det.timestamp_sec) }}</span>
+            {% elif det.frame_number %}
+            <span>frame {{ det.frame_number }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Unknowns -->
+    {% if unknowns %}
+    <div class="section-head">
+      ❓ Unknown Faces
+      <span class="count">{{ unknowns | length }}</span>
+    </div>
+    <div class="det-grid">
+      {% for unk in unknowns %}
+      <div class="det-card unk-card">
+        {% if unk.crop_path %}
+        <img src="{{ url_for('static', filename=unk.crop_path) }}"
+             alt="Unknown face"
+             onerror="this.parentElement.innerHTML='<div class=\'no-img\'>❓</div>'">
+        {% else %}
+        <div class="no-img">❓</div>
+        {% endif %}
+        <div class="unk-body">
+          <div class="det-name" style="color:var(--text-muted);">Unidentified</div>
+          {% if unk.best_score %}
+          <div class="conf-wrap">
+            <div class="conf-bar low" style="width:{{ (unk.best_score * 100) | round(1) }}%"></div>
+          </div>
+          <div class="det-meta">
+            <span class="unk-label">Best: {{ (unk.best_score * 100) | round(1) }}%</span>
+            {% if unk.closest_suspect and unk.closest_suspect != 'None' %}
+            <span class="unk-label">≈ {{ unk.closest_suspect }}</span>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not detections and not unknowns and media.status == 'done' %}
+    <div style="text-align:center;padding:3rem;color:var(--text-muted);">
+      <div style="font-size:3rem;margin-bottom:.75rem;">🔍</div>
+      <p>No faces detected in this media.</p>
+    </div>
+    {% endif %}
+
+  </div><!-- /main col -->
+</div><!-- /results-wrap -->
+{% endblock %}
+
+{% block scripts %}
+{% if media.status == 'running' %}
+<script>
+(function () {
+  var id = {{ media.id }};
+  var iv = setInterval(function () {
+    fetch('/job-status/' + id)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.status === 'done' || d.status === 'failed') {
+          clearInterval(iv);
+          location.reload();
+        } else if (d.progress != null) {
+          var pct = d.progress + '%';
+          var b1 = document.getElementById('prog-bar');
+          var b2 = document.getElementById('prog-bar-main');
+          var t1 = document.getElementById('prog-pct');
+          var t2 = document.getElementById('prog-pct-main');
+          if (b1) b1.style.width = pct;
+          if (b2) b2.style.width = pct;
+          if (t1) t1.textContent = d.progress;
+          if (t2) t2.textContent = d.progress;
+        }
+      })
+      .catch(function () {});
+  }, 3000);
+})();
+</script>
+{% endif %}
+{% endblock %}

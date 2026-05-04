@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Reports — CrimAI{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Reports</h1>
+
+<!-- KPI Row -->
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">Total Detections</div>
+    <div class="kpi-value">{{ total_detections }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Avg Confidence</div>
+    <div class="kpi-value">{{ "%.1f%%"|format(avg_confidence * 100) }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">This Week</div>
+    <div class="kpi-value">{{ detections_this_week }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">This Month</div>
+    <div class="kpi-value">{{ detections_this_month }}</div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="charts-row">
+  <div class="chart-card">
+    <h2>Priority Distribution</h2>
+    <canvas id="donutChart"></canvas>
+  </div>
+  <div class="chart-card">
+    <h2>Monthly Trend</h2>
+    <canvas id="trendChart"></canvas>
+  </div>
+</div>
+
+<!-- Region Breakdown -->
+<section class="section">
+  <h2>Region Breakdown</h2>
+  {% if region_breakdown %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Region</th>
+        <th>Count</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for region, count in region_breakdown %}
+      <tr>
+        <td>{{ region or 'Unknown' }}</td>
+        <td>{{ count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">No data available.</p>
+  {% endif %}
+</section>
+
+<!-- Recent Detections Feed -->
+<section class="section">
+  <h2>Recent Detections</h2>
+  {% if last_detections %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Suspect</th>
+        <th>Case ID</th>
+        <th>Confidence</th>
+        <th>Timestamp</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for det in last_detections %}
+      <tr>
+        <td>{{ det.suspect.name if det.suspect else 'Unknown' }}</td>
+        <td>{{ det.media.case_id if det.media else '—' }}</td>
+        <td>{{ "%.1f%%"|format(det.confidence * 100) }}</td>
+        <td>{{ det.detected_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">No detections yet.</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  var priorityData = {{ priority_distribution | tojson }};
+  var monthlyTrend = {{ monthly_trend | tojson }};
+
+  drawDonutChart('donutChart', priorityData);
+  drawLineChart('trendChart', monthlyTrend);
+</script>
+{% endblock %}

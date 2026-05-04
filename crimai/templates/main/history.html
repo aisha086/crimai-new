@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}History — CrimAI{% endblock %}
+
+{% block content %}
+<style>
+  .history-toolbar { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.5rem; align-items: center; }
+  .history-toolbar .search-input { flex: 1; min-width: 200px; }
+  .history-toolbar select { min-width: 140px; }
+
+  .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+
+  .h-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+            padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: .6rem;
+            transition: transform .15s, box-shadow .15s; }
+  .h-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+
+  .h-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; }
+  .h-case-id { font-weight: 700; font-size: .95rem; color: var(--text);
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .h-badges { display: flex; gap: .35rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+  .h-filename { font-size: .8rem; color: var(--text-muted);
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .h-meta { display: grid; grid-template-columns: 1fr 1fr; gap: .25rem .75rem; font-size: .8rem; }
+  .h-meta-item { display: flex; flex-direction: column; }
+  .h-meta-label { color: var(--text-muted); font-size: .7rem; text-transform: uppercase;
+                  letter-spacing: .04em; }
+  .h-meta-val { color: var(--text); }
+
+  .h-card-footer { margin-top: auto; padding-top: .6rem;
+                   border-top: 1px solid var(--border); }
+
+  /* Priority colours */
+  .pri-critical { background: rgba(239,68,68,.15); color: #ef4444; }
+  .pri-high     { background: rgba(245,158,11,.15); color: #f59e0b; }
+  .pri-medium   { background: rgba(79,142,247,.15); color: #4f8ef7; }
+  .pri-low      { background: rgba(34,197,94,.15);  color: #22c55e; }
+
+  /* Status colours */
+  .st-done    { background: rgba(34,197,94,.15);  color: #22c55e; }
+  .st-running { background: rgba(56,189,248,.15); color: #38bdf8; }
+  .st-failed  { background: rgba(239,68,68,.15);  color: #ef4444; }
+  .st-pending { background: rgba(136,146,164,.15);color: #8892a4; }
+
+  .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text-muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: .75rem; }
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+  <h1 style="font-size:1.4rem;font-weight:700;">Evidence History</h1>
+  <a href="{{ url_for('main.detect') }}" class="btn btn-primary btn-sm">+ Upload</a>
+</div>
+
+<div class="history-toolbar">
+  <input type="text" id="history-search" class="search-input form-control"
+         placeholder="Search case ID, filename, inspector, region…">
+  <select id="status-filter" class="form-control" onchange="filterStatus(this.value)">
+    <option value="">All statuses</option>
+    <option value="pending">Pending</option>
+    <option value="running">Running</option>
+    <option value="done">Done</option>
+    <option value="failed">Failed</option>
+  </select>
+</div>
+
+{% if media_records %}
+<div class="history-grid">
+  {% for m in media_records %}
+  <div class="h-card media-card" data-status="{{ m.status }}">
+    <div class="h-card-top">
+      <div class="h-case-id">{{ m.case_id or '(no case ID)' }}</div>
+      <div class="h-badges">
+        <span class="badge pri-{{ m.priority | lower }}">{{ m.priority }}</span>
+        <span class="badge st-{{ m.status }}">{{ m.status | capitalize }}</span>
+      </div>
+    </div>
+
+    <div class="h-filename" title="{{ m.filename }}">📎 {{ m.filename }}</div>
+
+    <div class="h-meta">
+      <div class="h-meta-item">
+        <span class="h-meta-label">Inspector</span>
+        <span class="h-meta-val">{{ m.inspector or '—' }}</span>
+      </div>
+      <div class="h-meta-item">
+        <span class="h-meta-label">Region</span>
+        <span class="h-meta-val">{{ m.region or '—' }}</span>
+      </div>
+      <div class="h-meta-item">
+        <span class="h-meta-label">Type</span>
+        <span class="h-meta-val">{{ m.file_type | capitalize }}</span>
+      </div>
+      <div class="h-meta-item">
+        <span class="h-meta-label">Uploaded</span>
+        <span class="h-meta-val">{{ m.uploaded_at.strftime('%d %b %Y') }}</span>
+      </div>
+    </div>
+
+    <div class="h-card-footer">
+      <a href="{{ url_for('main.results', media_id=m.id) }}" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;">
+        View Results →
+      </a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="icon">📂</div>
+  <p>No evidence uploaded yet.</p>
+  <a href="{{ url_for('main.detect') }}" class="btn btn-primary" style="margin-top:1rem;">Upload Evidence</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  initLiveSearch('history-search', '.media-card', null);
+  function filterStatus(val) {
+    document.querySelectorAll('.media-card').forEach(function (c) {
+      c.style.display = (!val || c.dataset.status === val) ? '' : 'none';
+    });
+  }
+</script>
+{% endblock %}

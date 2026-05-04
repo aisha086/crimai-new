@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Regions — CrimAI{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Regions</h1>
+
+<div class="card">
+  <ul class="region-list">
+    {% for region in regions %}
+    <li class="region-item">{{ region }}</li>
+    {% else %}
+    <li class="empty-state">No regions configured.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

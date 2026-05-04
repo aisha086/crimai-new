@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en" id="html-root">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}CrimAI{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script>
+    // Apply theme before first paint to avoid flash
+    (function() {
+      if (localStorage.getItem('theme') === 'light') {
+        document.documentElement.classList.add('light-mode');
+      }
+    })();
+  </script>
+</head>
+<body>
+  <nav class="navbar">
+    <a class="navbar-brand" href="{{ url_for('main.dashboard') }}">🔍 CrimAI</a>
+    {% if current_user.is_authenticated %}
+    <ul class="nav-links">
+      <li><a href="{{ url_for('main.dashboard') }}" {% if request.endpoint == 'main.dashboard' %}class="active"{% endif %}>Dashboard</a></li>
+      <li><a href="{{ url_for('main.suspects') }}" {% if request.endpoint and 'suspect' in request.endpoint %}class="active"{% endif %}>Suspects</a></li>
+      <li><a href="{{ url_for('main.detect') }}" {% if request.endpoint == 'main.detect' %}class="active"{% endif %}>Detect</a></li>
+      <li><a href="{{ url_for('main.history') }}" {% if request.endpoint == 'main.history' %}class="active"{% endif %}>History</a></li>
+      <li><a href="{{ url_for('main.reports') }}" {% if request.endpoint == 'main.reports' %}class="active"{% endif %}>Reports</a></li>
+      <li><a href="{{ url_for('main.regions') }}" {% if request.endpoint == 'main.regions' %}class="active"{% endif %}>Regions</a></li>
+      <li><a href="{{ url_for('main.reported_cases') }}" {% if request.endpoint == 'main.reported_cases' %}class="active"{% endif %}>Cases</a></li>
+      <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
+    </ul>
+    {% endif %}
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌓</button>
+  </nav>
+
+  <div class="flash-messages">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+
+  <main class="page-content">
+    <div class="container">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
