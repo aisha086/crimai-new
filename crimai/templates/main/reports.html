@@ -97,7 +97,14 @@
   var priorityData = {{ priority_distribution | tojson }};
   var monthlyTrend = {{ monthly_trend | tojson }};
 
-  drawDonutChart('donutChart', priorityData);
-  drawLineChart('trendChart', monthlyTrend);
+  var donutLabels = priorityData.map(function(r) { return r[0]; });
+  var donutData   = priorityData.map(function(r) { return r[1]; });
+  var trendLabels = monthlyTrend.map(function(r) { return r[0].slice(5); });
+  var trendData   = monthlyTrend.map(function(r) { return r[1]; });
+
+  var donutCanvas = document.getElementById('donutChart');
+  var trendCanvas = document.getElementById('trendChart');
+  if (donutCanvas && donutLabels.length) drawDonutChart(donutCanvas.getContext('2d'), donutLabels, donutData);
+  if (trendCanvas && trendLabels.length) drawLineChart(trendCanvas.getContext('2d'), trendLabels, trendData);
 </script>
 {% endblock %}

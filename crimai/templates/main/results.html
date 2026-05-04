@@ -3,150 +3,271 @@
 
 {% block content %}
 <style>
-  /* ── Page-level overrides ── */
-  .results-wrap {
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 1.5rem;
-    align-items: start;
-  }
-  @media (max-width: 900px) { .results-wrap { grid-template-columns: 1fr; } }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  body { font-family: 'Inter', sans-serif; }
 
-  /* Sidebar */
-  .meta-card { position: sticky; top: calc(var(--nav-height) + 1.5rem); }
-  .meta-row { display: flex; justify-content: space-between; align-items: center;
-              padding: 0.55rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
-  .meta-row:last-child { border-bottom: none; }
-  .meta-label { color: var(--text-muted); font-weight: 500; }
-  .meta-value { color: var(--text); text-align: right; max-width: 160px;
-                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* ── Layout ── */
+  .r-wrap { display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem; align-items: start; }
+  @media(max-width:960px){ .r-wrap { grid-template-columns: 1fr; } }
 
-  /* Priority colours */
-  .pri-critical { background: rgba(239,68,68,.15); color: #ef4444; }
-  .pri-high     { background: rgba(245,158,11,.15); color: #f59e0b; }
-  .pri-medium   { background: rgba(79,142,247,.15); color: #4f8ef7; }
-  .pri-low      { background: rgba(34,197,94,.15);  color: #22c55e; }
+  /* ── Video ── */
+  .video-shell { background: #000; border-radius: 16px; overflow: hidden;
+                 box-shadow: 0 12px 40px rgba(0,0,0,.6); margin-bottom: 1.25rem; }
+  .video-shell video { width: 100%; display: block; max-height: 540px; }
 
-  /* Video player */
-  .video-wrap { border-radius: 12px; overflow: hidden; background: #000;
-                box-shadow: 0 8px 32px rgba(0,0,0,.5); }
-  .video-wrap video { width: 100%; display: block; max-height: 520px; }
-
-  /* Spinner */
-  .spinner-wrap { display: flex; flex-direction: column; align-items: center;
-                  gap: 1.25rem; padding: 3rem; }
-  .spinner { width: 48px; height: 48px; border: 4px solid var(--border);
+  /* ── Status states ── */
+  .state-card { background: var(--surface); border: 1px solid var(--border);
+                border-radius: 16px; padding: 2.5rem; text-align: center;
+                margin-bottom: 1.25rem; }
+  .spinner { width: 52px; height: 52px; border: 4px solid var(--border);
              border-top-color: var(--accent); border-radius: 50%;
-             animation: spin .8s linear infinite; }
+             animation: spin .75s linear infinite; margin: 0 auto 1rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .state-card p { color: var(--text-muted); font-size: .9rem; margin-bottom: 1rem; }
+  .prog-label { font-size: .8rem; color: var(--text-muted); margin-bottom: .4rem; }
 
-  /* Error box */
-  .error-box { border-left: 4px solid var(--danger); background: rgba(239,68,68,.08);
-               border-radius: 10px; padding: 1.25rem; }
-  .error-box strong { color: var(--danger); display: block; margin-bottom: .4rem; }
+  .error-shell { background: rgba(239,68,68,.07); border: 1px solid rgba(239,68,68,.3);
+                 border-radius: 16px; padding: 1.5rem; margin-bottom: 1.25rem; }
+  .error-shell strong { color: #ef4444; display: block; margin-bottom: .5rem; font-size: 1rem; }
+  .error-shell p { font-size: .875rem; color: var(--text); }
 
-  /* Section headings */
-  .section-head { display: flex; align-items: center; gap: .6rem;
-                  font-size: 1rem; font-weight: 700; margin: 1.75rem 0 1rem; }
-  .section-head .count { background: var(--surface2); border: 1px solid var(--border);
-                         border-radius: 999px; padding: .15em .65em;
-                         font-size: .75rem; color: var(--text-muted); }
+  /* ── Detection timeline ── */
+  .tl-header { display: flex; align-items: center; justify-content: space-between;
+               margin-bottom: 1rem; }
+  .tl-title { font-size: .95rem; font-weight: 700; }
+  .tl-count { background: var(--surface2); border: 1px solid var(--border);
+              border-radius: 999px; padding: .15em .7em; font-size: .75rem;
+              color: var(--text-muted); }
 
-  /* Detection cards */
-  .det-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
-  .det-card { background: var(--surface); border: 1px solid var(--border);
-              border-radius: 12px; overflow: hidden;
-              transition: transform .15s, box-shadow .15s; }
-  .det-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
-  .det-card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block; }
-  .det-card .no-img { width: 100%; aspect-ratio: 1/1; display: flex; align-items: center;
-                      justify-content: center; background: var(--surface2);
-                      color: var(--text-muted); font-size: 2rem; }
-  .det-body { padding: .75rem; }
-  .det-name { font-weight: 600; font-size: .9rem; margin-bottom: .4rem;
-              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .conf-wrap { height: 6px; background: var(--surface2); border-radius: 999px;
-               overflow: hidden; margin-bottom: .35rem; }
-  .conf-bar  { height: 100%; border-radius: 999px; background: var(--accent); }
-  .conf-bar.high { background: var(--success); }
-  .conf-bar.med  { background: var(--warning); }
-  .conf-bar.low  { background: var(--danger); }
-  .det-meta { font-size: .75rem; color: var(--text-muted); display: flex;
-              justify-content: space-between; }
+  .tl-item { display: flex; gap: .85rem; align-items: flex-start;
+             padding: .75rem 0; border-bottom: 1px solid var(--border); }
+  .tl-item:last-child { border-bottom: none; }
 
-  /* Unknown cards */
-  .unk-card { background: var(--surface); border: 1px solid var(--border);
-              border-radius: 12px; overflow: hidden; opacity: .85; }
-  .unk-card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block;
-                  filter: grayscale(60%); }
-  .unk-body { padding: .75rem; }
-  .unk-label { font-size: .8rem; color: var(--text-muted); font-style: italic; }
+  .tl-thumb { width: 56px; height: 56px; border-radius: 10px; object-fit: cover;
+              flex-shrink: 0; background: var(--surface2); }
+  .tl-thumb-ph { width: 56px; height: 56px; border-radius: 10px; background: var(--surface2);
+                 display: flex; align-items: center; justify-content: center;
+                 font-size: 1.5rem; flex-shrink: 0; }
+  .tl-body { flex: 1; min-width: 0; }
+  .tl-name { font-weight: 700; font-size: .9rem; margin-bottom: .2rem;
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tl-time { font-size: .75rem; color: var(--text-muted); margin-bottom: .4rem; }
+  .tl-bar-wrap { height: 5px; background: var(--surface2); border-radius: 999px; overflow: hidden; }
+  .tl-bar { height: 100%; border-radius: 999px; }
+  .tl-bar.hi { background: #22c55e; }
+  .tl-bar.md { background: #f59e0b; }
+  .tl-bar.lo { background: #ef4444; }
+  .tl-pct { font-size: .75rem; font-weight: 700; margin-top: .25rem; }
+  .tl-pct.hi { color: #22c55e; }
+  .tl-pct.md { color: #f59e0b; }
+  .tl-pct.lo { color: #ef4444; }
 
-  /* Action buttons */
-  .action-row { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1.25rem; }
+  .unk-item .tl-name { color: var(--text-muted); font-style: italic; }
+  .unk-item .tl-thumb { filter: grayscale(70%); opacity: .7; }
+
+  /* ── Sidebar meta ── */
+  .meta-shell { background: var(--surface); border: 1px solid var(--border);
+                border-radius: 16px; padding: 1.25rem;
+                position: sticky; top: calc(var(--nav-height) + 1rem); }
+  .meta-shell h3 { font-size: .8rem; font-weight: 700; text-transform: uppercase;
+                   letter-spacing: .07em; color: var(--text-muted); margin-bottom: 1rem; }
+  .meta-row { display: flex; justify-content: space-between; align-items: center;
+              padding: .5rem 0; border-bottom: 1px solid var(--border); font-size: .83rem; }
+  .meta-row:last-of-type { border-bottom: none; }
+  .meta-lbl { color: var(--text-muted); }
+  .meta-val { font-weight: 600; text-align: right; max-width: 150px;
+              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .pri-critical { background:rgba(239,68,68,.15);  color:#ef4444; }
+  .pri-high     { background:rgba(245,158,11,.15); color:#f59e0b; }
+  .pri-medium   { background:rgba(79,142,247,.15); color:#4f8ef7; }
+  .pri-low      { background:rgba(34,197,94,.15);  color:#22c55e; }
+
+  .meta-actions { display: flex; flex-direction: column; gap: .6rem; margin-top: 1.1rem; }
+  .meta-actions .btn { justify-content: center; }
+
+  /* Summary pills */
+  .summary-row { display: flex; gap: .6rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .pill { background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+          padding: .35em .9em; font-size: .8rem; font-weight: 600; display: flex;
+          align-items: center; gap: .4rem; }
+  .pill-green { border-color: rgba(34,197,94,.4); color: #22c55e; background: rgba(34,197,94,.08); }
+  .pill-grey  { border-color: rgba(136,146,164,.4); color: var(--text-muted); }
 </style>
 
-<div class="results-wrap">
+<div class="r-wrap">
+
+  <!-- ── Main column ── -->
+  <div>
+
+    <!-- Summary pills -->
+    {% if media.status == 'done' %}
+    <div class="summary-row">
+      {% if detections %}
+      <span class="pill pill-green">🎯 {{ detections|length }} match{{ 'es' if detections|length != 1 }}</span>
+      {% endif %}
+      {% if unknowns %}
+      <span class="pill pill-grey">❓ {{ unknowns|length }} unknown{{ 's' if unknowns|length != 1 }}</span>
+      {% endif %}
+      {% if not detections and not unknowns %}
+      <span class="pill pill-grey">🔍 No faces detected</span>
+      {% endif %}
+      {% if media.finished_at %}
+      <span class="pill pill-grey">⏱ {{ media.finished_at.strftime('%H:%M, %d %b') }}</span>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Video / state -->
+    {% if media.status == 'done' and media.output_path %}
+    <div class="video-shell">
+      <video controls preload="metadata">
+        <source src="{{ url_for('static', filename=media.output_path) }}">
+        Your browser does not support HTML5 video.
+      </video>
+    </div>
+    <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:1.25rem;">
+      Bounding boxes are drawn directly on the video — green for matched suspects, grey for unknowns.
+    </p>
+
+    {% elif media.status == 'done' and not media.output_path %}
+    <div class="state-card" style="padding:1.25rem;text-align:left;">
+      <p style="margin:0;color:var(--text-muted);font-size:.875rem;">✓ Image processed — detections listed below.</p>
+    </div>
+
+    {% elif media.status == 'running' %}
+    <div class="state-card">
+      <div class="spinner"></div>
+      <p>Analysing evidence — this may take a few minutes</p>
+      <div class="prog-label">Progress: <span id="prog-pct-main">{{ media.progress }}</span>%</div>
+      <div class="progress-bar-wrap" style="max-width:320px;margin:0 auto;">
+        <div class="progress-bar" id="prog-bar-main" style="width:{{ media.progress }}%"></div>
+      </div>
+    </div>
+
+    {% elif media.status == 'failed' %}
+    <div class="error-shell">
+      <strong>⚠ Processing failed</strong>
+      <p>{{ media.error_msg or 'An unknown error occurred during processing.' }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Detection timeline -->
+    {% if detections or unknowns %}
+    <div class="tl-header">
+      <span class="tl-title">Detection Log</span>
+      <span class="tl-count">{{ (detections|length) + (unknowns|length) }} events</span>
+    </div>
+
+    {% for det in detections %}
+    {% set pct = (det.confidence * 100)|round(1) %}
+    {% set cls = 'hi' if det.confidence >= 0.75 else ('md' if det.confidence >= 0.5 else 'lo') %}
+    <div class="tl-item">
+      {% if det.crop_path %}
+      <img class="tl-thumb"
+           src="{{ url_for('static', filename=det.crop_path) }}"
+           alt="{{ det.suspect.name if det.suspect else 'Unknown' }}"
+           onerror="this.outerHTML='<div class=\'tl-thumb-ph\'>👤</div>'">
+      {% else %}
+      <div class="tl-thumb-ph">👤</div>
+      {% endif %}
+      <div class="tl-body">
+        <div class="tl-name">{{ det.suspect.name if det.suspect else 'Unknown Suspect' }}</div>
+        <div class="tl-time">
+          {% if det.timestamp_sec and det.timestamp_sec > 0 %}⏱ {{ "%.1f"|format(det.timestamp_sec) }}s
+          {% elif det.frame_number %}Frame {{ det.frame_number }}
+          {% else %}Image detection{% endif %}
+        </div>
+        <div class="tl-bar-wrap"><div class="tl-bar {{ cls }}" style="width:{{ pct }}%"></div></div>
+        <div class="tl-pct {{ cls }}">{{ pct }}% confidence</div>
+      </div>
+    </div>
+    {% endfor %}
+
+    {% for unk in unknowns %}
+    <div class="tl-item unk-item">
+      {% if unk.crop_path %}
+      <img class="tl-thumb"
+           src="{{ url_for('static', filename=unk.crop_path) }}"
+           alt="Unknown"
+           onerror="this.outerHTML='<div class=\'tl-thumb-ph\'>❓</div>'">
+      {% else %}
+      <div class="tl-thumb-ph">❓</div>
+      {% endif %}
+      <div class="tl-body">
+        <div class="tl-name">Unidentified person</div>
+        <div class="tl-time">
+          {% if unk.closest_suspect and unk.closest_suspect != 'None' %}
+          Closest: {{ unk.closest_suspect }}
+          {% else %}No match in watchlist{% endif %}
+        </div>
+        {% if unk.best_score %}
+        <div class="tl-bar-wrap">
+          <div class="tl-bar lo" style="width:{{ (unk.best_score*100)|round(1) }}%"></div>
+        </div>
+        <div class="tl-pct lo">{{ (unk.best_score*100)|round(1) }}% best score</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+  </div><!-- /main -->
 
   <!-- ── Sidebar ── -->
   <aside>
-    <div class="card meta-card">
-      <div style="font-size:1rem;font-weight:700;margin-bottom:1rem;">📋 Case Info</div>
+    <div class="meta-shell">
+      <h3>Case Info</h3>
 
       <div class="meta-row">
-        <span class="meta-label">Case ID</span>
-        <span class="meta-value">{{ media.case_id or '—' }}</span>
+        <span class="meta-lbl">Case ID</span>
+        <span class="meta-val">{{ media.case_id or '—' }}</span>
       </div>
       <div class="meta-row">
-        <span class="meta-label">File</span>
-        <span class="meta-value" title="{{ media.filename }}">{{ media.filename }}</span>
+        <span class="meta-lbl">File</span>
+        <span class="meta-val" title="{{ media.filename }}">{{ media.filename }}</span>
       </div>
       <div class="meta-row">
-        <span class="meta-label">Type</span>
-        <span class="meta-value">{{ media.file_type | capitalize }}</span>
+        <span class="meta-lbl">Type</span>
+        <span class="meta-val">{{ media.file_type|capitalize }}</span>
       </div>
       <div class="meta-row">
-        <span class="meta-label">Inspector</span>
-        <span class="meta-value">{{ media.inspector or '—' }}</span>
+        <span class="meta-lbl">Inspector</span>
+        <span class="meta-val">{{ media.inspector or '—' }}</span>
       </div>
       <div class="meta-row">
-        <span class="meta-label">Region</span>
-        <span class="meta-value">{{ media.region or '—' }}</span>
+        <span class="meta-lbl">Region</span>
+        <span class="meta-val">{{ media.region or '—' }}</span>
       </div>
       <div class="meta-row">
-        <span class="meta-label">Priority</span>
-        <span class="meta-value">
-          <span class="badge pri-{{ media.priority | lower }}">{{ media.priority }}</span>
+        <span class="meta-lbl">Priority</span>
+        <span class="meta-val">
+          <span class="badge pri-{{ media.priority|lower }}">{{ media.priority }}</span>
         </span>
       </div>
       <div class="meta-row">
-        <span class="meta-label">Status</span>
-        <span class="meta-value">
-          {% if media.status == 'done' %}
-            <span class="badge badge-success">✓ Done</span>
-          {% elif media.status == 'running' %}
-            <span class="badge badge-info">⟳ Running</span>
-          {% elif media.status == 'failed' %}
-            <span class="badge badge-danger">✗ Failed</span>
-          {% else %}
-            <span class="badge badge-secondary">{{ media.status }}</span>
-          {% endif %}
+        <span class="meta-lbl">Status</span>
+        <span class="meta-val">
+          {% if media.status == 'done' %}<span class="badge badge-success">✓ Done</span>
+          {% elif media.status == 'running' %}<span class="badge badge-info">⟳ Running</span>
+          {% elif media.status == 'failed' %}<span class="badge badge-danger">✗ Failed</span>
+          {% else %}<span class="badge badge-secondary">{{ media.status }}</span>{% endif %}
         </span>
       </div>
       <div class="meta-row">
-        <span class="meta-label">Uploaded</span>
-        <span class="meta-value">{{ media.uploaded_at.strftime('%d %b %Y') }}</span>
+        <span class="meta-lbl">Uploaded</span>
+        <span class="meta-val">{{ media.uploaded_at.strftime('%d %b %Y') }}</span>
       </div>
       {% if media.finished_at %}
       <div class="meta-row">
-        <span class="meta-label">Finished</span>
-        <span class="meta-value">{{ media.finished_at.strftime('%d %b %Y %H:%M') }}</span>
+        <span class="meta-lbl">Finished</span>
+        <span class="meta-val">{{ media.finished_at.strftime('%d %b, %H:%M') }}</span>
       </div>
       {% endif %}
 
       {% if media.status == 'running' %}
       <div style="margin-top:1rem;">
-        <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:.4rem;">
+        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:.35rem;">
           Progress — <span id="prog-pct">{{ media.progress }}</span>%
         </div>
         <div class="progress-bar-wrap">
@@ -155,159 +276,38 @@
       </div>
       {% endif %}
 
-      <div class="action-row">
+      <div class="meta-actions">
         <a href="{{ url_for('main.report_editor', media_id=media.id) }}" class="btn btn-primary btn-sm">
           📝 Edit Report
         </a>
-        <a href="{{ url_for('main.history') }}" class="btn btn-secondary btn-sm">← History</a>
+        <a href="{{ url_for('main.history') }}" class="btn btn-secondary btn-sm">← Back to History</a>
       </div>
     </div>
   </aside>
 
-  <!-- ── Main column ── -->
-  <div>
-
-    <!-- Video / status area -->
-    {% if media.status == 'done' and media.output_path %}
-    <div class="video-wrap">
-      <video controls preload="metadata">
-        <source src="{{ url_for('static', filename=media.output_path) }}">
-        Your browser does not support HTML5 video.
-      </video>
-    </div>
-    {% elif media.status == 'done' and not media.output_path %}
-    {# Image — no output video, just show detections below #}
-    <div class="card" style="padding:1rem;color:var(--text-muted);font-size:.9rem;">
-      ✓ Image processed — see detections below.
-    </div>
-    {% elif media.status == 'running' %}
-    <div class="card spinner-wrap">
-      <div class="spinner"></div>
-      <p style="color:var(--text-muted);">Processing… please wait</p>
-      <div style="width:100%;max-width:320px;">
-        <div class="progress-bar-wrap">
-          <div class="progress-bar" id="prog-bar-main" style="width:{{ media.progress }}%"></div>
-        </div>
-        <div style="text-align:center;font-size:.8rem;color:var(--text-muted);margin-top:.4rem;">
-          <span id="prog-pct-main">{{ media.progress }}</span>%
-        </div>
-      </div>
-    </div>
-    {% elif media.status == 'failed' %}
-    <div class="error-box">
-      <strong>⚠ Processing failed</strong>
-      <p style="font-size:.875rem;color:var(--text);">{{ media.error_msg or 'An unknown error occurred.' }}</p>
-    </div>
-    {% endif %}
-
-    <!-- Detections -->
-    {% if detections %}
-    <div class="section-head">
-      🎯 Matched Suspects
-      <span class="count">{{ detections | length }}</span>
-    </div>
-    <div class="det-grid">
-      {% for det in detections %}
-      {% set pct = (det.confidence * 100) | round(1) %}
-      {% set bar_class = 'high' if det.confidence >= 0.75 else ('med' if det.confidence >= 0.5 else 'low') %}
-      <div class="det-card">
-        {% if det.crop_path %}
-        <img src="{{ url_for('static', filename=det.crop_path) }}"
-             alt="{{ det.suspect.name if det.suspect else 'Unknown' }}"
-             onerror="this.parentElement.innerHTML='<div class=\'no-img\'>👤</div>'">
-        {% else %}
-        <div class="no-img">👤</div>
-        {% endif %}
-        <div class="det-body">
-          <div class="det-name">{{ det.suspect.name if det.suspect else 'Unknown' }}</div>
-          <div class="conf-wrap">
-            <div class="conf-bar {{ bar_class }}" style="width:{{ pct }}%"></div>
-          </div>
-          <div class="det-meta">
-            <span>{{ pct }}% match</span>
-            {% if det.timestamp_sec is not none and det.timestamp_sec > 0 %}
-            <span>@ {{ "%.1fs" | format(det.timestamp_sec) }}</span>
-            {% elif det.frame_number %}
-            <span>frame {{ det.frame_number }}</span>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    <!-- Unknowns -->
-    {% if unknowns %}
-    <div class="section-head">
-      ❓ Unknown Faces
-      <span class="count">{{ unknowns | length }}</span>
-    </div>
-    <div class="det-grid">
-      {% for unk in unknowns %}
-      <div class="det-card unk-card">
-        {% if unk.crop_path %}
-        <img src="{{ url_for('static', filename=unk.crop_path) }}"
-             alt="Unknown face"
-             onerror="this.parentElement.innerHTML='<div class=\'no-img\'>❓</div>'">
-        {% else %}
-        <div class="no-img">❓</div>
-        {% endif %}
-        <div class="unk-body">
-          <div class="det-name" style="color:var(--text-muted);">Unidentified</div>
-          {% if unk.best_score %}
-          <div class="conf-wrap">
-            <div class="conf-bar low" style="width:{{ (unk.best_score * 100) | round(1) }}%"></div>
-          </div>
-          <div class="det-meta">
-            <span class="unk-label">Best: {{ (unk.best_score * 100) | round(1) }}%</span>
-            {% if unk.closest_suspect and unk.closest_suspect != 'None' %}
-            <span class="unk-label">≈ {{ unk.closest_suspect }}</span>
-            {% endif %}
-          </div>
-          {% endif %}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    {% if not detections and not unknowns and media.status == 'done' %}
-    <div style="text-align:center;padding:3rem;color:var(--text-muted);">
-      <div style="font-size:3rem;margin-bottom:.75rem;">🔍</div>
-      <p>No faces detected in this media.</p>
-    </div>
-    {% endif %}
-
-  </div><!-- /main col -->
-</div><!-- /results-wrap -->
+</div>
 {% endblock %}
 
 {% block scripts %}
 {% if media.status == 'running' %}
 <script>
-(function () {
+(function(){
   var id = {{ media.id }};
-  var iv = setInterval(function () {
-    fetch('/job-status/' + id)
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (d.status === 'done' || d.status === 'failed') {
-          clearInterval(iv);
-          location.reload();
-        } else if (d.progress != null) {
-          var pct = d.progress + '%';
-          var b1 = document.getElementById('prog-bar');
-          var b2 = document.getElementById('prog-bar-main');
-          var t1 = document.getElementById('prog-pct');
-          var t2 = document.getElementById('prog-pct-main');
-          if (b1) b1.style.width = pct;
-          if (b2) b2.style.width = pct;
-          if (t1) t1.textContent = d.progress;
-          if (t2) t2.textContent = d.progress;
+  var iv = setInterval(function(){
+    fetch('/job-status/'+id)
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d.status==='done'||d.status==='failed'){ clearInterval(iv); location.reload(); return; }
+        if(d.progress!=null){
+          var pct = d.progress+'%';
+          ['prog-bar','prog-bar-main'].forEach(function(id){
+            var el=document.getElementById(id); if(el) el.style.width=pct;
+          });
+          ['prog-pct','prog-pct-main'].forEach(function(id){
+            var el=document.getElementById(id); if(el) el.textContent=d.progress;
+          });
         }
-      })
-      .catch(function () {});
+      }).catch(function(){});
   }, 3000);
 })();
 </script>

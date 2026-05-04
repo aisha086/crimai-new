@@ -73,15 +73,19 @@ def dashboard():
         .all()
     )
 
-    # Region breakdown: list of (region, count)
-    region_counts = (
-        db.session.query(Media.region, func.count())
+    # Region breakdown: list of [region, count] — plain lists for JSON serialisation
+    region_counts = [
+        [row[0] or "Unknown", row[1]]
+        for row in db.session.query(Media.region, func.count())
         .group_by(Media.region)
         .all()
-    )
+    ]
 
-    # Monthly detection counts for the last 6 months
-    monthly_counts = _get_monthly_counts(months=6)
+    # Monthly detection counts for the last 6 months — plain lists
+    monthly_counts = [
+        [label, count]
+        for label, count in _get_monthly_counts(months=6)
+    ]
 
     return render_template(
         "main/dashboard.html",
@@ -92,6 +96,7 @@ def dashboard():
         recent_detections=recent_detections,
         region_counts=region_counts,
         monthly_counts=monthly_counts,
+        now=datetime.utcnow(),
     )
 
 
@@ -411,22 +416,27 @@ def reports():
         DetectionResult.detected_at >= month_ago
     ).count()
 
-    # Priority distribution: list of (priority, count)
-    priority_distribution = (
-        db.session.query(Media.priority, func.count())
+    # Priority distribution: list of [priority, count] — plain lists for JSON
+    priority_distribution = [
+        [row[0] or "Unknown", row[1]]
+        for row in db.session.query(Media.priority, func.count())
         .group_by(Media.priority)
         .all()
-    )
+    ]
 
-    # Monthly trend for last 6 months
-    monthly_trend = _get_monthly_counts(months=6)
+    # Monthly trend for last 6 months — plain lists
+    monthly_trend = [
+        [label, count]
+        for label, count in _get_monthly_counts(months=6)
+    ]
 
-    # Region breakdown: list of (region, count)
-    region_breakdown = (
-        db.session.query(Media.region, func.count())
+    # Region breakdown: list of [region, count] — plain lists
+    region_breakdown = [
+        [row[0] or "Unknown", row[1]]
+        for row in db.session.query(Media.region, func.count())
         .group_by(Media.region)
         .all()
-    )
+    ]
 
     # Last 20 detections
     last_detections = (

@@ -690,15 +690,22 @@ def _process_video(
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    # Step 3: Create temp AVI output path
-    avi_filename = f"out_{uuid.uuid4().hex}.avi"
-    avi_path = os.path.join(UPLOAD_OUTPUT, avi_filename)
+    # Step 3: Write directly to MP4 — try H.264 first, fall back to mp4v
+    mp4_filename = f"out_{uuid.uuid4().hex}.mp4"
+    mp4_path = os.path.join(UPLOAD_OUTPUT, mp4_filename)
     os.makedirs(UPLOAD_OUTPUT, exist_ok=True)
     os.makedirs(UPLOAD_CROPS, exist_ok=True)
 
-    # Step 4: Create VideoWriter with XVID codec
-    fourcc = cv2.VideoWriter_fourcc(*"XVID")
-    writer = cv2.VideoWriter(avi_path, fourcc, fps, (width, height))
+    # Step 4: Create VideoWriter — avc1 = H.264 (works on many OpenCV builds),
+    #          mp4v = MPEG-4 fallback (always available, plays in most browsers)
+    def _make_writer(path: str, fourcc_str: str) -> cv2.VideoWriter:
+        fourcc = cv2.VideoWriter_fourcc(*fourcc_str)
+        w = cv2.VideoWriter(path, fourcc, fps, (width, height))
+        return w if w.isOpened() else None
+
+    writer = _make_writer(mp4_path, "avc1") or _make_writer(mp4_path, "mp4v")
+    if writer is None:
+        raise RuntimeError("Could not open VideoWriter with avc1 or mp4v codec")
 
     fa = get_app()
     alert_frames_remaining = 0
@@ -829,53 +836,44 @@ def _process_video(
         cap.release()
         writer.release()
 
-    # Step 7: Re-encode with ffmpeg to H.264 MP4
-    mp4_filename = avi_filename.replace(".avi", ".mp4")
-    mp4_path = os.path.join(UPLOAD_OUTPUT, mp4_filename)
-
+    # Step 7: Optionally re-encode with ffmpeg for better H.264 compatibility.
+    # The OpenCV output is already an MP4 so it will play even without ffmpeg.
+    reencoded_path = mp4_path.replace(".mp4", "_h264.mp4")
     ffmpeg_result = None
     try:
         ffmpeg_result = subprocess.run(
             [
-                "ffmpeg",
-                "-y",
-                "-i", avi_path,
+                "ffmpeg", "-y",
+                "-i", mp4_path,
                 "-c:v", "libx264",
                 "-preset", "fast",
                 "-crf", "23",
-                mp4_path,
+                "-movflags", "+faststart",
+                reencoded_path,
             ],
             capture_output=True,
         )
     except FileNotFoundError:
-        logger.warning(
-            "_process_video: ffmpeg not found on PATH for media %d; falling back to AVI.",
+        logger.info(
+            "_process_video: ffmpeg not on PATH for media %d — using OpenCV MP4 directly.",
             media_id,
         )
 
     if ffmpeg_result is not None and ffmpeg_result.returncode == 0:
-        # Step 8: ffmpeg succeeded — use MP4, delete AVI
-        output_path = mp4_path
+        output_path = reencoded_path
         try:
-            os.remove(avi_path)
+            os.remove(mp4_path)
         except Exception:
             pass
-        logger.info(
-            "_process_video: ffmpeg re-encoding succeeded for media %d → %r.",
-            media_id,
-            mp4_path,
-        )
+        logger.info("_process_video: ffmpeg re-encode succeeded for media %d.", media_id)
     else:
-        # Step 9: ffmpeg failed or not available — fall back to AVI
+        # OpenCV MP4 is already usable — no error message needed
+        output_path = mp4_path
         if ffmpeg_result is not None:
-            stderr_text = ffmpeg_result.stderr.decode("utf-8", errors="replace")
-            logger.error(
-                "_process_video: ffmpeg re-encoding failed for media %d. stderr:\n%s",
+            logger.warning(
+                "_process_video: ffmpeg failed for media %d, using OpenCV output.",
                 media_id,
-                stderr_text,
             )
-        output_path = avi_path
-        media.error_msg = "ffmpeg re-encoding failed; using raw AVI output"
 
     # Step 10: Finalise media record
     media.output_path = _to_relative(output_path)
