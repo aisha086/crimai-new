@@ -175,7 +175,7 @@ Migrate and expand the existing Streamlit prototype into a production-grade Flas
     - `GET /reported_cases`: query `Media` records that have an associated `CaseReport`; support filter by status and region
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 14.1, 14.2, 14.3_
 
-  - [~] 10.6 Write unit tests for API routes
+  - [ ] 10.6 Write unit tests for API routes
     - Test `GET /job-status/<id>` returns 200 JSON for an existing media record
     - Test `GET /job-status/<id>` returns 404 JSON for a missing media ID
     - Test `POST /report/custom/save/<id>` with valid HTML creates/updates a `CaseReport` record
@@ -263,13 +263,13 @@ Migrate and expand the existing Streamlit prototype into a production-grade Flas
     - _Requirements: 11.3, 11.4, 11.5, 12.2, 12.3, 15.2, 15.3, 15.6_
 
 - [ ] 15. Test infrastructure and property-based tests
-  - [~] 15.1 Create `tests/conftest.py`
+  - [ ] 15.1 Create `tests/conftest.py`
     - Flask test client fixture using in-memory SQLite (`SQLALCHEMY_DATABASE_URI='sqlite://'`)
     - Temporary upload directories fixture using `tmp_path`
     - Mock FaceEngine fixture that returns a stub `FaceAnalysis` object
     - _Requirements: (test infrastructure)_
 
-  - [~] 15.2 Write property tests for serialisation — Properties 1 and 2
+  - [ ] 15.2 Write property tests for serialisation — Properties 1 and 2
     - **Property 1: Gallery Serialisation Round-Trip**
     - Generate lists of random float32 numpy arrays with Hypothesis; assert element-wise equality after `pickle.dumps` → `pickle.loads`
     - **Property 2: Embedding Serialisation Round-Trip**
@@ -277,13 +277,13 @@ Migrate and expand the existing Streamlit prototype into a production-grade Flas
     - Place both in `tests/test_properties.py` with `# Feature: crimai-flask-app, Property 1` and `Property 2` comments
     - **Validates: Requirements 16.1, 16.2, 16.3, 16.4, 16.5**
 
-  - [~] 15.3 Consolidate all property tests into `tests/test_properties.py`
+  - [ ] 15.3 Consolidate all property tests into `tests/test_properties.py`
     - Move or import P3–P6 property tests (from tasks 4.5–4.7 and 8.3) into `tests/test_properties.py`
     - Annotate each with the `# Feature: crimai-flask-app, Property N` comment convention
     - Ensure minimum 100 iterations per property via `@settings(max_examples=100)`
     - _Requirements: 7.4, 16.3, 16.5, 18.5, 18.6, 1.2, 1.8_
 
-- [~] 16. Final checkpoint — full test suite
+- [ ] 16. Final checkpoint — full test suite
   - Ensure all tests pass (`pytest tests/ -v`), ask the user if questions arise.
 
 ## Notes

@@ -48,7 +48,19 @@ def create_app(config_object=None) -> Flask:
     # 1. Load configuration defaults from crimai.config
     # ------------------------------------------------------------------
     app.config["SECRET_KEY"] = _cfg.SECRET_KEY
-    app.config.setdefault("SQLALCHEMY_DATABASE_URI", "sqlite:///crimai.db")
+    # DATABASE_URL env var → Supabase/Postgres in production
+    # Falls back to local SQLite for development
+    app.config.setdefault(
+        "SQLALCHEMY_DATABASE_URI",
+        os.environ.get("DATABASE_URL", "sqlite:///crimai.db"),
+    )
+    # Postgres connection pool settings (ignored by SQLite)
+    # Note: sslmode=require is already embedded in the DATABASE_URL query string
+    # from Supabase — no need to add it to connect_args separately.
+    app.config.setdefault("SQLALCHEMY_ENGINE_OPTIONS", {
+        "pool_pre_ping": True,   # test connections before use
+        "pool_recycle": 300,     # recycle connections every 5 min
+    })
     app.config.setdefault("UPLOAD_EVIDENCE", _cfg.UPLOAD_EVIDENCE)
     app.config.setdefault("UPLOAD_SUSPECTS", _cfg.UPLOAD_SUSPECTS)
     app.config.setdefault("UPLOAD_CROPS", _cfg.UPLOAD_CROPS)
@@ -94,5 +106,13 @@ def create_app(config_object=None) -> Flask:
 
     app.register_blueprint(auth_blueprint, url_prefix="/auth")
     app.register_blueprint(main_blueprint, url_prefix="/")
+
+    # Make storage_url available in all templates
+    from crimai import storage as _storage  # noqa: PLC0415
+
+    @app.template_global()
+    def storage_url(path: str) -> str:
+        """Return the correct URL for a stored file (local or Supabase)."""
+        return _storage.public_url(path)
 
     return app

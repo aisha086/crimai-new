@@ -77,7 +77,7 @@
       <div class="s-card suspect-row">
         {% if s.photo_path %}
         <img class="s-photo"
-             src="{{ url_for('static', filename=s.photo_path) }}"
+             src="{{ storage_url(s.photo_path) }}"
              alt="{{ s.name }}"
              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
         <div class="s-photo-placeholder" style="display:none;">👤</div>

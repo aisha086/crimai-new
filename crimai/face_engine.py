@@ -32,6 +32,7 @@ from crimai.config import (
     UPLOAD_CROPS,
     UPLOAD_OUTPUT,
 )
+from crimai import storage as _storage
 
 logger = logging.getLogger(__name__)
 
@@ -209,6 +210,26 @@ def match_embedding(
     return None, best_score
 
 
+def _save_crop(img: "np.ndarray", prefix: str) -> tuple[str, str]:
+    """Write a crop image to storage and return (local_path, storage_path).
+
+    In local mode  : writes directly to UPLOAD_CROPS, returns same path twice.
+    In Supabase mode: writes to a temp file, uploads, cleans up temp, returns storage path.
+    """
+    crop_filename = f"{prefix}_{uuid.uuid4().hex}.jpg"
+    storage_path = f"uploads/crops/{crop_filename}"
+    local_path = _storage.local_write_path(storage_path)
+    cv2.imwrite(local_path, img)
+    _storage.save_file(local_path, storage_path)
+    # Clean up temp file in Supabase mode (local_write_path returns a temp path)
+    if _storage.is_supabase_enabled():
+        try:
+            os.remove(local_path)
+        except Exception:
+            pass
+    return local_path, storage_path
+
+
 def _to_relative(abs_path: str) -> str:
     """Strip the static folder prefix from a path; return the part after static/.
 
@@ -264,13 +285,19 @@ def enroll_single(app, suspect_id: int) -> None:
             return
 
         try:
-            # Reconstruct the full path to the photo
-            full_photo_path = os.path.join(STATIC_FOLDER, suspect.photo_path)
+            # Download photo to a local path (handles both local and Supabase mode)
+            full_photo_path = _storage.download_to_temp(suspect.photo_path)
             img = cv2.imread(full_photo_path)
             if img is None:
                 raise ValueError(
                     f"cv2.imread returned None for path: {full_photo_path!r}"
                 )
+            # Clean up temp download in Supabase mode
+            if _storage.is_supabase_enabled():
+                try:
+                    os.remove(full_photo_path)
+                except Exception:
+                    pass
 
             fa = get_app()
             gallery: list[np.ndarray] = []
@@ -402,9 +429,7 @@ def enroll_group_image(app, temp_path: str) -> None:
                 crop = img[y1:y2, x1:x2]
 
                 # Save crop to UPLOAD_CROPS directory
-                crop_filename = f"group_{uuid.uuid4().hex}.jpg"
-                crop_path = os.path.join(UPLOAD_CROPS, crop_filename)
-                cv2.imwrite(crop_path, crop)
+                _, crop_path = _save_crop(crop, "group")
 
                 # L2-normalise the face embedding
                 emb = face.embedding.astype(np.float32)
@@ -421,7 +446,7 @@ def enroll_group_image(app, temp_path: str) -> None:
                 suspect = Suspect(
                     name=f"Unknown_{uuid.uuid4().hex[:8]}",
                     region="Unknown",
-                    photo_path=_to_relative(crop_path),
+                    photo_path=crop_path,   # already a storage path
                     gallery=pickle.dumps([emb_normalised]),
                     enroll_mode="structured",
                     enroll_status="ready",
@@ -496,13 +521,19 @@ def process_media(app, media_id: int) -> None:
                 _process_video(app, media, db, suspect_embeddings)
                 return
 
-            # Step 4: Read the image
-            img_path = os.path.join(STATIC_FOLDER, media.file_path)
+            # Step 4: Read the image (download from Supabase if needed)
+            img_path = _storage.download_to_temp(media.file_path)
             img = cv2.imread(img_path)
             if img is None:
                 raise ValueError(
                     f"cv2.imread returned None for path: {img_path!r}"
                 )
+            # Clean up temp download in Supabase mode
+            if _storage.is_supabase_enabled():
+                try:
+                    os.remove(img_path)
+                except Exception:
+                    pass
 
             # Step 5: Apply CLAHE preprocessing
             preprocessed_img = preprocess_frame(img)
@@ -524,9 +555,7 @@ def process_media(app, media_id: int) -> None:
                 y2 = min(img_h, y2)
                 crop = img[y1:y2, x1:x2]
 
-                crop_filename = f"det_{uuid.uuid4().hex}.jpg"
-                crop_path = os.path.join(UPLOAD_CROPS, crop_filename)
-                cv2.imwrite(crop_path, crop)
+                _, crop_path = _save_crop(crop, "det")
 
                 # Step 7b: L2-normalise the embedding
                 emb = face.embedding.astype(np.float32)
@@ -551,7 +580,7 @@ def process_media(app, media_id: int) -> None:
                         confidence=score,
                         frame_number=0,
                         timestamp_sec=0.0,
-                        crop_path=_to_relative(crop_path),
+                        crop_path=crop_path,          # already a storage path
                         frame_path=_to_relative(img_path),
                     )
                     db.session.add(detection)
@@ -565,7 +594,7 @@ def process_media(app, media_id: int) -> None:
                     # Step 7e: No match — create UnknownIdentity
                     unknown = UnknownIdentity(
                         media_id=media_id,
-                        crop_path=_to_relative(crop_path),
+                        crop_path=crop_path,          # already a storage path
                         embedding=pickle.dumps(emb),
                         best_score=score,
                         closest_suspect=label if label is not None else "None",
@@ -677,7 +706,10 @@ def _process_video(
     from crimai.models import DetectionResult, UnknownIdentity
 
     media_id = media.id
-    video_path = os.path.join(STATIC_FOLDER, media.file_path)
+
+    # Download video to a local temp file (handles both local and Supabase mode)
+    video_path = _storage.download_to_temp(media.file_path)
+    _video_is_temp = _storage.is_supabase_enabled()  # clean up temp after processing
 
     # Step 1: Open the video
     cap = cv2.VideoCapture(video_path)
@@ -749,9 +781,7 @@ def _process_video(
 
                     # Save face crop
                     crop = frame[y1:y2, x1:x2]
-                    crop_filename = f"vid_{uuid.uuid4().hex}.jpg"
-                    crop_path = os.path.join(UPLOAD_CROPS, crop_filename)
-                    cv2.imwrite(crop_path, crop)
+                    _, crop_path = _save_crop(crop, "vid")
 
                     if label is not None:
                         # Match found — green box with label
@@ -777,7 +807,7 @@ def _process_video(
                             confidence=score,
                             frame_number=frame_idx,
                             timestamp_sec=timestamp_sec,
-                            crop_path=_to_relative(crop_path),
+                            crop_path=crop_path,          # already a storage path
                             frame_path=_to_relative(video_path),
                         )
                         db.session.add(detection)
@@ -796,7 +826,7 @@ def _process_video(
 
                         unknown = UnknownIdentity(
                             media_id=media_id,
-                            crop_path=_to_relative(crop_path),
+                            crop_path=crop_path,          # already a storage path
                             embedding=pickle.dumps(emb),
                             best_score=score,
                             closest_suspect="None",
@@ -860,23 +890,36 @@ def _process_video(
         )
 
     if ffmpeg_result is not None and ffmpeg_result.returncode == 0:
-        output_path = reencoded_path
+        output_local = reencoded_path
         try:
             os.remove(mp4_path)
         except Exception:
             pass
         logger.info("_process_video: ffmpeg re-encode succeeded for media %d.", media_id)
     else:
-        # OpenCV MP4 is already usable — no error message needed
-        output_path = mp4_path
+        output_local = mp4_path
         if ffmpeg_result is not None:
             logger.warning(
                 "_process_video: ffmpeg failed for media %d, using OpenCV output.",
                 media_id,
             )
 
+    # Upload the final video to storage
+    out_filename = os.path.basename(output_local)
+    output_storage_path = f"uploads/output/{out_filename}"
+    _storage.save_file(output_local, output_storage_path)
+
+    # Clean up local temp files when in Supabase mode
+    if _video_is_temp:
+        for _tmp in [video_path, output_local]:
+            try:
+                if os.path.isfile(_tmp):
+                    os.remove(_tmp)
+            except Exception:
+                pass
+
     # Step 10: Finalise media record
-    media.output_path = _to_relative(output_path)
+    media.output_path = output_storage_path
     media.status = "done"
     media.progress = 100
     media.finished_at = datetime.utcnow()
@@ -888,5 +931,5 @@ def _process_video(
     logger.info(
         "_process_video: Completed video processing for media %d. Output: %r.",
         media_id,
-        output_path,
+        output_storage_path,
     )

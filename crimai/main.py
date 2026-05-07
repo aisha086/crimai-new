@@ -39,6 +39,7 @@ from crimai.config import (
 )
 from crimai.face_engine import enroll_group_image, enroll_single, get_app, process_media
 from crimai.models import CaseReport, DetectionResult, Media, Suspect, UnknownIdentity, db
+from crimai import storage
 
 main = Blueprint("main", __name__)
 
@@ -103,26 +104,27 @@ def dashboard():
 def _get_monthly_counts(months: int = 6) -> list[tuple[str, int]]:
     """Return list of (month_str, count) for the last *months* months.
 
-    Uses SQLite's ``strftime('%Y-%m', uploaded_at)`` to group Media records.
+    Uses to_char on PostgreSQL, strftime on SQLite — both via SQLAlchemy.
     """
+    dialect = db.engine.dialect.name
+
+    if dialect == "postgresql":
+        month_expr = func.to_char(Media.uploaded_at, "YYYY-MM").label("month")
+    else:
+        month_expr = func.strftime("%Y-%m", Media.uploaded_at).label("month")
+
     rows = (
-        db.session.query(
-            func.strftime("%Y-%m", Media.uploaded_at).label("month"),
-            func.count().label("cnt"),
-        )
+        db.session.query(month_expr, func.count().label("cnt"))
         .group_by("month")
         .order_by("month")
         .all()
     )
 
-    # Build a dict for quick lookup
     counts_by_month: dict[str, int] = {row.month: row.cnt for row in rows}
 
-    # Generate the last *months* month labels
     result: list[tuple[str, int]] = []
     now = datetime.utcnow()
     for i in range(months - 1, -1, -1):
-        # Go back i months from now
         target = now - timedelta(days=30 * i)
         label = target.strftime("%Y-%m")
         result.append((label, counts_by_month.get(label, 0)))
@@ -168,13 +170,15 @@ def enroll_suspect():
         return redirect(url_for("main.suspects"))
 
     filename = f"{uuid.uuid4().hex}.{ext}"
-    save_path = os.path.join(UPLOAD_SUSPECTS, filename)
-    file.save(save_path)
+    storage_path = f"uploads/suspects/{filename}"
+    local_path = storage.local_write_path(storage_path)
+    file.save(local_path)
+    storage.save_file(local_path, storage_path)
 
     suspect = Suspect(
         name=request.form.get("name", "Unknown"),
         region=request.form.get("region", "Unknown"),
-        photo_path=f"uploads/suspects/{filename}",
+        photo_path=storage_path,
         enroll_status="processing",
     )
     db.session.add(suspect)
@@ -204,8 +208,11 @@ def enroll_group():
 
     # Save to a temporary path; the background thread will delete it when done
     temp_filename = f"group_tmp_{uuid.uuid4().hex}.{ext}"
-    temp_path = os.path.join(UPLOAD_SUSPECTS, temp_filename)
+    temp_storage = f"uploads/suspects/{temp_filename}"
+    temp_path = storage.local_write_path(temp_storage)
     file.save(temp_path)
+    # For group enrollment we pass the local path — face_engine reads it directly
+    # then deletes it. In Supabase mode we keep a local temp copy for processing.
 
     app = current_app._get_current_object()
     t = threading.Thread(
@@ -223,14 +230,9 @@ def delete_suspect(suspect_id: int):
     """Delete a suspect and their photo from disk."""
     suspect = Suspect.query.get_or_404(suspect_id)
 
-    # Remove photo file from disk (best-effort)
+    # Remove photo file from storage (best-effort)
     if suspect.photo_path:
-        full_path = os.path.join(STATIC_FOLDER, suspect.photo_path)
-        try:
-            if os.path.isfile(full_path):
-                os.remove(full_path)
-        except OSError:
-            pass  # Non-fatal; DB record is still deleted
+        storage.delete_file(suspect.photo_path)
 
     db.session.delete(suspect)
     db.session.commit()
@@ -286,12 +288,14 @@ def detect_post():
             continue
 
         filename = f"{uuid.uuid4().hex}.{ext}"
-        save_path = os.path.join(UPLOAD_EVIDENCE, filename)
-        file.save(save_path)
+        storage_path = f"uploads/evidence/{filename}"
+        local_path = storage.local_write_path(storage_path)
+        file.save(local_path)
+        storage.save_file(local_path, storage_path)
 
         media = Media(
             filename=file.filename,
-            file_path=f"uploads/evidence/{filename}",
+            file_path=storage_path,
             file_type=file_type,
             case_id=case_id,
             priority=priority,

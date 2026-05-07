@@ -122,7 +122,7 @@
     {% if media.status == 'done' and media.output_path %}
     <div class="video-shell">
       <video controls preload="metadata">
-        <source src="{{ url_for('static', filename=media.output_path) }}">
+        <source src="{{ storage_url(media.output_path) }}">
         Your browser does not support HTML5 video.
       </video>
     </div>
@@ -165,7 +165,7 @@
     <div class="tl-item">
       {% if det.crop_path %}
       <img class="tl-thumb"
-           src="{{ url_for('static', filename=det.crop_path) }}"
+           src="{{ storage_url(det.crop_path) }}"
            alt="{{ det.suspect.name if det.suspect else 'Unknown' }}"
            onerror="this.outerHTML='<div class=\'tl-thumb-ph\'>👤</div>'">
       {% else %}
@@ -188,7 +188,7 @@
     <div class="tl-item unk-item">
       {% if unk.crop_path %}
       <img class="tl-thumb"
-           src="{{ url_for('static', filename=unk.crop_path) }}"
+           src="{{ storage_url(unk.crop_path) }}"
            alt="Unknown"
            onerror="this.outerHTML='<div class=\'tl-thumb-ph\'>❓</div>'">
       {% else %}
